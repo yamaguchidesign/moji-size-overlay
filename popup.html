@@ -1,0 +1,195 @@
+<!DOCTYPE html>
+<html lang="ja">
+
+<head>
+  <meta charset="utf-8">
+  <style>
+    body {
+      width: 300px;
+      padding: 20px;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      margin: 0;
+    }
+
+    .header {
+      text-align: center;
+      margin-bottom: 20px;
+    }
+
+    .title {
+      font-size: 18px;
+      font-weight: bold;
+      color: #333;
+      margin: 0 0 5px 0;
+    }
+
+    .subtitle {
+      font-size: 12px;
+      color: #666;
+      margin: 0;
+    }
+
+    .toggle-container {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 20px;
+      padding: 15px;
+      background: #f5f5f5;
+      border-radius: 8px;
+    }
+
+    .toggle-label {
+      font-size: 14px;
+      color: #333;
+      font-weight: 500;
+    }
+
+    .toggle-switch {
+      position: relative;
+      width: 50px;
+      height: 24px;
+      background: #ccc;
+      border-radius: 12px;
+      cursor: pointer;
+      transition: background 0.3s;
+    }
+
+    .toggle-switch.active {
+      background: #e65100;
+    }
+
+    .toggle-slider {
+      position: absolute;
+      top: 2px;
+      left: 2px;
+      width: 20px;
+      height: 20px;
+      background: white;
+      border-radius: 50%;
+      transition: transform 0.3s;
+      box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+    }
+
+    .toggle-switch.active .toggle-slider {
+      transform: translateX(26px);
+    }
+
+    .instructions {
+      background: #fff3e0;
+      padding: 15px;
+      border-radius: 8px;
+      border-left: 4px solid #e65100;
+    }
+
+    .instructions h3 {
+      margin: 0 0 10px 0;
+      font-size: 14px;
+      color: #bf360c;
+    }
+
+    .instructions p {
+      margin: 0 0 8px 0;
+      font-size: 12px;
+      color: #333;
+      line-height: 1.4;
+    }
+
+    .status {
+      text-align: center;
+      margin-top: 15px;
+      font-size: 12px;
+      color: #666;
+    }
+
+    .mode-container {
+      margin-bottom: 20px;
+      padding: 15px;
+      background: #f5f5f5;
+      border-radius: 8px;
+    }
+
+    .mode-label {
+      font-size: 14px;
+      color: #333;
+      font-weight: 500;
+      margin-bottom: 10px;
+    }
+
+    .mode-options {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .mode-option {
+      display: flex;
+      align-items: center;
+      cursor: pointer;
+      padding: 8px;
+      border-radius: 4px;
+      transition: background-color 0.2s;
+    }
+
+    .mode-option:hover {
+      background: rgba(0, 0, 0, 0.05);
+    }
+
+    .mode-option input[type="radio"] {
+      margin-right: 8px;
+      cursor: pointer;
+    }
+
+    .mode-text {
+      font-size: 13px;
+      color: #333;
+      cursor: pointer;
+    }
+
+    .mode-option input[type="radio"]:checked+.mode-text {
+      color: #e65100;
+      font-weight: 500;
+    }
+  </style>
+</head>
+
+<body>
+  <div class="header">
+    <div class="title">文字サイズオーバーレイ</div>
+    <div class="subtitle">CSSの font-size 指定を表示</div>
+  </div>
+
+  <div class="toggle-container">
+    <div class="toggle-label">オーバーレイ表示</div>
+    <div class="toggle-switch" id="toggleSwitch">
+      <div class="toggle-slider"></div>
+    </div>
+  </div>
+
+  <div class="mode-container">
+    <div class="mode-label">表示モード</div>
+    <div class="mode-options">
+      <label class="mode-option">
+        <input type="radio" name="displayMode" value="all_and_mouse" id="modeAllAndMouse">
+        <span class="mode-text">全表示 + マウスオーバー</span>
+      </label>
+      <label class="mode-option">
+        <input type="radio" name="displayMode" value="mouse_only" id="modeMouseOnly">
+        <span class="mode-text">マウスオーバーのみ</span>
+      </label>
+    </div>
+  </div>
+
+  <div class="instructions">
+    <h3>使い方</h3>
+    <p>ONにすると、<strong>直下にテキストノードがある要素</strong>の近くに、スタイルシートやインラインに書かれた font-size（および font の略記から取れるサイズ）を表示します。</p>
+    <p>外部CSSがクロスオリジンで読めない場合や継承のみのときは、算出値の末尾に「(算出)」と付きます。</p>
+    <p><strong>注意:</strong> 設定はサイト（オリジン）ごとに保存されます。初めて開くサイトでは既定でOFFです。</p>
+  </div>
+
+  <div class="status" id="statusText">読み込み中...</div>
+
+  <script src="popup.js"></script>
+</body>
+
+</html>
