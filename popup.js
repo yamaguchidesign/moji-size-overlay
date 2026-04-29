@@ -18,6 +18,48 @@ function getSiteKey(url) {
   }
 }
 
+function canUseSitePermission(url) {
+  try {
+    const u = new URL(url);
+    return u.protocol === "https:" || u.protocol === "http:";
+  } catch (e) {
+    return false;
+  }
+}
+
+async function saveSiteSettings(enabled) {
+  const result = await chrome.storage.local.get(["siteSettings"]);
+  const siteSettings = result.siteSettings || {};
+  const siteKey = getSiteKey(currentTab.url);
+  siteSettings[siteKey] = enabled;
+  await new Promise(function (resolve) {
+    chrome.storage.local.set({ siteSettings: siteSettings }, resolve);
+  });
+}
+
+async function requestHostPermissionForCurrentTab() {
+  const origin = getSiteKey(currentTab.url);
+  return chrome.permissions.request({
+    origins: [origin + "/*"],
+  });
+}
+
+async function ensureInjectedIfEnabled() {
+  if (!currentTab || !currentTab.id) return;
+  if (!canUseSitePermission(currentTab.url)) return;
+  const origin = getSiteKey(currentTab.url);
+  const result = await chrome.storage.local.get(["siteSettings"]);
+  const siteSettings = result.siteSettings || {};
+  if (!siteSettings[origin]) return;
+  const hasPerm = await chrome.permissions.contains({ origins: [origin + "/*"] });
+  if (!hasPerm) return;
+  await chrome.runtime.sendMessage({
+    action: "registerAndInject",
+    origin: origin,
+    tabId: currentTab.id,
+  });
+}
+
 async function getExtensionStatus() {
   try {
     const result = await chrome.storage.local.get(["siteSettings", "displayMode"]);
@@ -47,35 +89,52 @@ async function getExtensionStatus() {
   }
 }
 
-async function saveSiteSettings(enabled) {
-  const result = await chrome.storage.local.get(["siteSettings"]);
-  const siteSettings = result.siteSettings || {};
-  const siteKey = getSiteKey(currentTab.url);
-  siteSettings[siteKey] = enabled;
-  await chrome.storage.local.set({ siteSettings: siteSettings });
-}
-
 async function toggleExtension(enabled) {
   try {
-    await saveSiteSettings(enabled);
-    updateUI(enabled);
-
-    try {
-      const response = await chrome.tabs.sendMessage(currentTab.id, {
-        action: "toggleOverlay",
-        enabled: enabled,
+    if (enabled) {
+      if (!canUseSitePermission(currentTab.url)) {
+        statusText.textContent = "このページでは利用できません（http/https のページでお試しください）";
+        statusText.style.color = "#d32f2f";
+        return;
+      }
+      const granted = await requestHostPermissionForCurrentTab();
+      if (!granted) {
+        statusText.textContent = "このサイトで使うには許可が必要です。もう一度オンにしてください。";
+        statusText.style.color = "#ff9800";
+        return;
+      }
+      await saveSiteSettings(true);
+      await chrome.runtime.sendMessage({
+        action: "registerAndInject",
+        origin: getSiteKey(currentTab.url),
+        tabId: currentTab.id,
       });
-
-      if (response && response.success) {
-        statusText.textContent = enabled ? "オーバーレイ表示が有効です" : "オーバーレイ表示が無効です";
-        statusText.style.color = enabled ? "#e65100" : "#666";
-      } else {
-        statusText.textContent = "設定を保存しました。ページを再読み込みしてください。";
+      try {
+        await chrome.tabs.sendMessage(currentTab.id, { action: "ping" });
+        statusText.textContent = "オーバーレイ表示が有効です";
+        statusText.style.color = "#e65100";
+      } catch (error) {
+        statusText.textContent = "設定を保存しました。表示されない場合はページを再読み込みしてください。";
         statusText.style.color = "#ff9800";
       }
-    } catch (error) {
-      statusText.textContent = "設定を保存しました。ページを再読み込みしてください。";
-      statusText.style.color = "#ff9800";
+      updateUI(true);
+    } else {
+      await saveSiteSettings(false);
+      try {
+        await chrome.tabs.sendMessage(currentTab.id, {
+          action: "toggleOverlay",
+          enabled: false,
+        });
+      } catch (e) {
+        /* content script が無いタブでは無視 */
+      }
+      await chrome.runtime.sendMessage({
+        action: "unregisterOrigin",
+        origin: getSiteKey(currentTab.url),
+      });
+      statusText.textContent = "オーバーレイ表示が無効です";
+      statusText.style.color = "#666";
+      updateUI(false);
     }
   } catch (storageError) {
     statusText.textContent = "エラー: 設定の保存に失敗しました";
@@ -127,7 +186,7 @@ async function changeMode(mode) {
       statusText.style.color = "#d32f2f";
     }
   } catch (error) {
-    statusText.textContent = "エラー: ページを再読み込みしてください";
+    statusText.textContent = "エラー: ページを再読み込みするか、このサイトで拡張をオンにしてください";
     statusText.style.color = "#d32f2f";
   }
 }
@@ -148,9 +207,26 @@ async function initialize() {
       return;
     }
 
+    await ensureInjectedIfEnabled();
+
     const status = await getExtensionStatus();
     updateUI(status.enabled);
     updateModeUI(status.mode);
+
+    const origin = getSiteKey(currentTab.url);
+    const stored = await chrome.storage.local.get(["siteSettings"]);
+    const siteSettings = stored.siteSettings || {};
+    const storedOn = !!siteSettings[origin];
+    const hasPerm =
+      canUseSitePermission(currentTab.url) &&
+      (await chrome.permissions.contains({ origins: [origin + "/*"] }));
+
+    if (storedOn && !hasPerm && canUseSitePermission(currentTab.url)) {
+      statusText.textContent =
+        "このサイトでは以前オンにしていました。再度オンにすると、サイトごとの許可を求められます。";
+      statusText.style.color = "#ff9800";
+      return;
+    }
 
     try {
       await chrome.tabs.sendMessage(currentTab.id, { action: "ping" });
@@ -164,7 +240,7 @@ async function initialize() {
       }
     } catch (error) {
       if (status.enabled) {
-        statusText.textContent = "設定は有効ですが、ページを再読み込みしてください";
+        statusText.textContent = "設定は有効ですが、表示するにはページを再読み込みしてください";
         statusText.style.color = "#ff9800";
       } else {
         statusText.textContent = "オーバーレイ表示が無効です";

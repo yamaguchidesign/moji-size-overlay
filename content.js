@@ -641,49 +641,64 @@ async function initializeExtension() {
   }
 }
 
-chrome.runtime.onMessage.addListener(function (request, sender, sendResponse) {
-  if (request.action === "toggleOverlay") {
-    isOverlayEnabled = request.enabled;
-    const siteKey = getSiteKey(getCurrentUrl());
-    if (isOverlayEnabled) {
-      addEventListeners();
-      showAllOverlays();
-    } else {
-      removeEventListeners();
-    }
-    getSiteSettings().then(function (siteSettings) {
-      siteSettings[siteKey] = isOverlayEnabled;
-      chrome.storage.local.set({ siteSettings: siteSettings }, function () {
-        sendResponse({ success: true });
+function attachRuntimeMessageListener() {
+  if (globalThis.__FS_OVERLAY_MSG__) return;
+  globalThis.__FS_OVERLAY_MSG__ = true;
+  chrome.runtime.onMessage.addListener(function (request, sender, sendResponse) {
+    if (request.action === "toggleOverlay") {
+      isOverlayEnabled = request.enabled;
+      const siteKey = getSiteKey(getCurrentUrl());
+      if (isOverlayEnabled) {
+        addEventListeners();
+        showAllOverlays();
+      } else {
+        removeEventListeners();
+      }
+      getSiteSettings().then(function (siteSettings) {
+        siteSettings[siteKey] = isOverlayEnabled;
+        chrome.storage.local.set({ siteSettings: siteSettings }, function () {
+          sendResponse({ success: true });
+        });
       });
-    });
-    return true;
-  }
-  if (request.action === "changeMode") {
-    currentDisplayMode = request.mode;
-    setModeSettings(currentDisplayMode);
-    if (isOverlayEnabled) {
-      clearAllOverlays();
-      showAllOverlays();
+      return true;
     }
-    sendResponse({ success: true });
-    return true;
-  }
-  if (request.action === "getStatus") {
-    sendResponse({
-      enabled: isOverlayEnabled,
-      mode: currentDisplayMode,
-    });
-    return true;
-  }
-  if (request.action === "ping") {
-    sendResponse({ pong: true });
-    return true;
-  }
-});
+    if (request.action === "changeMode") {
+      currentDisplayMode = request.mode;
+      setModeSettings(currentDisplayMode);
+      if (isOverlayEnabled) {
+        clearAllOverlays();
+        showAllOverlays();
+      }
+      sendResponse({ success: true });
+      return true;
+    }
+    if (request.action === "getStatus") {
+      sendResponse({
+        enabled: isOverlayEnabled,
+        mode: currentDisplayMode,
+      });
+      return true;
+    }
+    if (request.action === "ping") {
+      sendResponse({ pong: true });
+      return true;
+    }
+    return undefined;
+  });
+}
 
-if (document.readyState === "loading") {
-  document.addEventListener("DOMContentLoaded", initializeExtension);
-} else {
+function scheduleInitializeExtension() {
+  if (document.readyState === "loading") {
+    document.addEventListener("DOMContentLoaded", initializeExtension);
+  } else {
+    initializeExtension();
+  }
+}
+
+if (globalThis.__FS_OVERLAY_DOC__ === document) {
   initializeExtension();
+} else {
+  globalThis.__FS_OVERLAY_DOC__ = document;
+  attachRuntimeMessageListener();
+  scheduleInitializeExtension();
 }

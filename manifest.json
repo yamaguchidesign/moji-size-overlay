@@ -1,16 +1,13 @@
 {
   "manifest_version": 3,
   "name": "文字サイズオーバーレイ",
-  "version": "1.0.1",
+  "version": "1.0.2",
   "description": "ページ上のテキスト付近に、CSSで指定されたfont-sizeの文字列を表示します",
-  "permissions": ["activeTab", "storage"],
-  "content_scripts": [
-    {
-      "matches": ["<all_urls>"],
-      "js": ["content.js"],
-      "css": ["content.css"]
-    }
-  ],
+  "permissions": ["activeTab", "storage", "scripting"],
+  "optional_host_permissions": ["https://*/*", "http://*/*"],
+  "background": {
+    "service_worker": "background.js"
+  },
   "action": {
     "default_popup": "popup.html",
     "default_title": "文字サイズオーバーレイ"
